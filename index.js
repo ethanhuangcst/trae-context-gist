@@ -96,28 +96,47 @@ function analyzeContext(conversationHistory) {
   const tasks = [];
   const decisions = [];
   
-  // 简单的关键词提取
   const lines = conversationHistory.split('\n');
+  let currentSection = '';
+  
   lines.forEach(line => {
     const trimmedLine = line.trim();
     
-    // 提取任务
-    if (trimmedLine.includes('任务') || trimmedLine.includes('todo') || 
-        trimmedLine.includes('需要') || trimmedLine.includes('要') ||
-        trimmedLine.includes('计划')) {
-      tasks.push(trimmedLine);
+    // 识别章节
+    if (trimmedLine.startsWith('### ')) {
+      currentSection = trimmedLine.replace('### ', '');
+      return;
+    }
+    
+    // 提取任务（列表项或包含任务关键词）
+    if (trimmedLine.match(/^\d+\./) || //  numbered list
+        trimmedLine.startsWith('- ') || // bullet list
+        trimmedLine.includes('任务') || 
+        trimmedLine.includes('需要') || 
+        trimmedLine.includes('要') ||
+        trimmedLine.includes('计划') ||
+        trimmedLine.includes('完成')) {
+      if (trimmedLine.length > 5 && !trimmedLine.startsWith('###')) {
+        tasks.push(trimmedLine);
+      }
     }
     
     // 提取关键点
     if (trimmedLine.includes('重要') || trimmedLine.includes('关键') || 
-        trimmedLine.includes('注意') || trimmedLine.includes('记住')) {
-      keyPoints.push(trimmedLine);
+        trimmedLine.includes('注意') || trimmedLine.includes('记住') ||
+        (currentSection && currentSection.includes('关键'))) {
+      if (trimmedLine.length > 5) {
+        keyPoints.push(trimmedLine);
+      }
     }
     
     // 提取决策
     if (trimmedLine.includes('决定') || trimmedLine.includes('确定') || 
-        trimmedLine.includes('选择') || trimmedLine.includes('采用')) {
-      decisions.push(trimmedLine);
+        trimmedLine.includes('选择') || trimmedLine.includes('采用') ||
+        trimmedLine.startsWith('- ') && currentSection && currentSection.includes('决策')) {
+      if (trimmedLine.length > 5) {
+        decisions.push(trimmedLine);
+      }
     }
   });
   
