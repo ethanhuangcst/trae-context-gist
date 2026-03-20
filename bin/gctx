@@ -11,6 +11,7 @@ program
 
 program
   .command('sync')
+  .alias('s')
   .description('同步当前项目的对话上下文到本地和 GitHub Gist')
   .option('-p, --project <name>', '指定项目名称（默认从当前目录提取）')
   .option('-d, --dir <path>', '指定笔记存储目录')
@@ -20,6 +21,7 @@ program
 
 program
   .command('list')
+  .alias('l')
   .description('列出所有笔记')
   .option('-p, --project <name>', '筛选指定项目的笔记')
   .option('-l, --local', '只显示本地笔记')
@@ -29,6 +31,7 @@ program
 
 program
   .command('config')
+  .alias('c')
   .description('配置 GitHub Token')
   .option('-t, --token <token>', '设置 GitHub Token')
   .option('-s, --show', '显示当前配置')
@@ -38,6 +41,7 @@ program
 
 program
   .command('init')
+  .alias('i')
   .description('初始化项目配置')
   .action(async () => {
     await cli.init();
