@@ -12,31 +12,38 @@ const path = require('path');
  * @returns {string} 项目名称
  */
 function extractProjectName(conversationHistory) {
-  const lines = conversationHistory.split('\n');
+  const globalTraeDir = path.join(process.env.HOME || '/Users/ethanhuang', '.trae');
   
-  // 常见的项目名称关键词
-  const projectKeywords = ['项目', 'project', '任务', 'task', '应用', 'app', '系统', 'system', '服务', 'service'];
-  
-  // 尝试从对话中提取项目名称
-  for (const line of lines) {
-    const trimmedLine = line.trim();
-    
-    // 查找包含项目关键词的行
-    for (const keyword of projectKeywords) {
-      if (trimmedLine.includes(keyword)) {
-        // 尝试提取项目名称
-        const parts = trimmedLine.split(/[:：]/);
-        if (parts.length > 1) {
-          const projectName = parts[1].trim().replace(/[\s\n\r]+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-          if (projectName) {
-            return projectName;
-          }
-        }
+  function findProjectRoot(startDir) {
+    let currentDir = path.resolve(startDir);
+    for (let i = 0; i < 20; i++) {
+      if (currentDir === globalTraeDir || currentDir.startsWith(globalTraeDir + path.sep)) {
+        return null;
       }
+      
+      const traeDir = path.join(currentDir, '.trae');
+      if (fs.existsSync(traeDir)) {
+        return currentDir;
+      }
+      
+      const parentDir = path.dirname(currentDir);
+      if (parentDir === currentDir) break;
+      currentDir = parentDir;
     }
+    return null;
   }
   
-  // 默认项目名称
+  let projectRoot = findProjectRoot(process.cwd());
+  if (!projectRoot) {
+    projectRoot = findProjectRoot(path.resolve(__dirname));
+  }
+  
+  if (projectRoot) {
+    let projectName = path.basename(projectRoot);
+    projectName = projectName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    return projectName;
+  }
+  
   return 'default';
 }
 
@@ -45,13 +52,13 @@ function extractProjectName(conversationHistory) {
  * @param {string} projectName - 项目名称
  * @returns {string} 项目笔记目录路径
  */
-function getProjectNotesDir(projectName) {
+function getProjectNotesDir() {
   if (process.env.LOCAL_NOTES_DIR) {
     const notesDir = process.env.LOCAL_NOTES_DIR;
     if (!path.isAbsolute(notesDir)) {
-      return path.join(__dirname, notesDir, projectName);
+      return path.join(__dirname, notesDir);
     } else {
-      return path.join(notesDir, projectName);
+      return notesDir;
     }
   }
   
@@ -84,12 +91,10 @@ function getProjectNotesDir(projectName) {
   }
   
   if (!projectRoot) {
-    return path.join(skillDir, 'notes', projectName);
+    return path.join(skillDir, 'notes');
   }
   
-  const projectNotesDir = path.join(projectRoot, '.trae', 'notes', projectName);
-  
-  return projectNotesDir;
+  return path.join(projectRoot, '.trae', 'notes');
 }
 
 // 加载环境变量
@@ -248,15 +253,12 @@ function analyzeContext(conversationHistory) {
  * @returns {object} 本地笔记信息
  */
 function saveNoteToLocal(content, fileName, projectName) {
-  // 获取项目特定的笔记目录
-  const notesDir = getProjectNotesDir(projectName);
+  const notesDir = getProjectNotesDir();
   
-  // 创建本地笔记目录
   if (!fs.existsSync(notesDir)) {
     fs.mkdirSync(notesDir, { recursive: true });
   }
   
-  // 保存笔记文件
   const notePath = path.join(notesDir, fileName);
   fs.writeFileSync(notePath, JSON.stringify(content, null, 2));
   
