@@ -56,15 +56,18 @@ function getProjectNotesDir(projectName) {
   }
   
   const globalTraeDir = path.join(process.env.HOME || '/Users/ethanhuang', '.trae');
+  const skillDir = path.resolve(__dirname);
   
   function findProjectRoot(startDir) {
-    let currentDir = startDir;
+    let currentDir = path.resolve(startDir);
     for (let i = 0; i < 20; i++) {
+      if (currentDir === globalTraeDir || currentDir.startsWith(globalTraeDir + path.sep)) {
+        return null;
+      }
+      
       const traeDir = path.join(currentDir, '.trae');
       if (fs.existsSync(traeDir)) {
-        if (currentDir !== globalTraeDir && !currentDir.startsWith(globalTraeDir + path.sep)) {
-          return currentDir;
-        }
+        return currentDir;
       }
       
       const parentDir = path.dirname(currentDir);
@@ -77,15 +80,11 @@ function getProjectNotesDir(projectName) {
   let projectRoot = findProjectRoot(process.cwd());
   
   if (!projectRoot) {
-    projectRoot = findProjectRoot(__dirname);
+    projectRoot = findProjectRoot(skillDir);
   }
   
   if (!projectRoot) {
-    projectRoot = findProjectRoot(path.dirname(path.dirname(path.dirname(__dirname))));
-  }
-  
-  if (!projectRoot) {
-    projectRoot = process.cwd();
+    return path.join(skillDir, 'notes', projectName);
   }
   
   const projectNotesDir = path.join(projectRoot, '.trae', 'notes', projectName);
