@@ -128,11 +128,9 @@ function analyzeContext(conversationHistory) {
   const tasks = [];
   const decisions = [];
   
-  // 尝试解析 JSON 格式
   try {
     const jsonData = JSON.parse(conversationHistory);
     
-    // 从 JSON 结构中提取数据
     if (jsonData.completedTasks) {
       jsonData.completedTasks.forEach(task => {
         if (typeof task === 'string') tasks.push(task);
@@ -160,7 +158,6 @@ function analyzeContext(conversationHistory) {
       });
     }
     
-    // 如果 JSON 解析成功且有内容，直接返回
     if (tasks.length > 0 || decisions.length > 0 || keyPoints.length > 0) {
       const summary = `对话包含 ${tasks.length} 个任务、${keyPoints.length} 个关键点和 ${decisions.length} 个决策`;
       
@@ -169,6 +166,7 @@ function analyzeContext(conversationHistory) {
         keyPoints,
         tasks,
         decisions,
+        rawContent: conversationHistory,
         timestamp: new Date().toISOString(),
         conversationLength: JSON.stringify(jsonData).split('\n').length,
         metadata: {
@@ -179,27 +177,23 @@ function analyzeContext(conversationHistory) {
       };
     }
   } catch (e) {
-    // 不是 JSON 格式，继续处理纯文本
   }
   
-  // 处理纯文本格式
   const lines = conversationHistory.split('\n');
   let currentSection = '';
   
   lines.forEach(line => {
     const trimmedLine = line.trim();
     
-    // 识别章节
     if (trimmedLine.startsWith('### ')) {
       currentSection = trimmedLine.replace('### ', '');
       return;
     }
     
-    // 提取任务（列表项或包含任务关键词）
-    if (trimmedLine.match(/^\d+\./) || //  numbered list
-        trimmedLine.startsWith('- ') || // bullet list
-        trimmedLine.includes('任务') || 
-        trimmedLine.includes('需要') || 
+    if (trimmedLine.match(/^\d+\./) ||
+        trimmedLine.startsWith('- ') ||
+        trimmedLine.includes('任务') ||
+        trimmedLine.includes('需要') ||
         trimmedLine.includes('要') ||
         trimmedLine.includes('计划') ||
         trimmedLine.includes('完成')) {
@@ -208,8 +202,7 @@ function analyzeContext(conversationHistory) {
       }
     }
     
-    // 提取关键点
-    if (trimmedLine.includes('重要') || trimmedLine.includes('关键') || 
+    if (trimmedLine.includes('重要') || trimmedLine.includes('关键') ||
         trimmedLine.includes('注意') || trimmedLine.includes('记住') ||
         (currentSection && currentSection.includes('关键'))) {
       if (trimmedLine.length > 5) {
@@ -217,8 +210,7 @@ function analyzeContext(conversationHistory) {
       }
     }
     
-    // 提取决策
-    if (trimmedLine.includes('决定') || trimmedLine.includes('确定') || 
+    if (trimmedLine.includes('决定') || trimmedLine.includes('确定') ||
         trimmedLine.includes('选择') || trimmedLine.includes('采用') ||
         trimmedLine.startsWith('- ') && currentSection && currentSection.includes('决策')) {
       if (trimmedLine.length > 5) {
@@ -227,7 +219,6 @@ function analyzeContext(conversationHistory) {
     }
   });
   
-  // 生成摘要
   const summary = `对话包含 ${tasks.length} 个任务、${keyPoints.length} 个关键点和 ${decisions.length} 个决策`;
   
   return {
@@ -235,6 +226,7 @@ function analyzeContext(conversationHistory) {
     keyPoints,
     tasks,
     decisions,
+    rawContent: conversationHistory,
     timestamp: new Date().toISOString(),
     conversationLength: lines.length,
     metadata: {
