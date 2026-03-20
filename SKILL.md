@@ -1,3 +1,8 @@
+---
+name: trae-context-gist
+description: "自动整理 TRAE CN 对话上下文，生成结构化笔记并存储到 GitHub Gist 云端。在用户输入'整理上下文'或'consolidate context'时触发。"
+---
+
 # trae-context-gist Skill
 
 ## Description
