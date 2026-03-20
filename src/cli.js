@@ -102,8 +102,8 @@ GITHUB_TOKEN=your_github_token_here
   console.log(chalk.green('\n✅ 初始化完成！'));
   console.log(chalk.yellow('\n下一步:'));
   console.log('   1. 获取 GitHub Token: https://github.com/settings/tokens/new');
-  console.log('   2. 配置 Token: synctx config --token <your-token>');
-  console.log('   3. 同步上下文: synctx sync');
+  console.log('   2. 配置 Token: samectx config --token <your-token>');
+  console.log('   3. 同步上下文: samectx sync');
 }
 
 module.exports = {

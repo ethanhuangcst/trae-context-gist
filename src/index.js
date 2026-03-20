@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const CONFIG_DIR = path.join(os.homedir(), '.synctx');
+const CONFIG_DIR = path.join(os.homedir(), '.samectx');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const GIST_MAPPING_FILE = path.join(CONFIG_DIR, 'gist-mapping.json');
 
@@ -76,7 +76,7 @@ function getProjectNotesDir(customDir) {
     return path.join(process.cwd(), notesDir);
   }
   
-  return path.join(process.cwd(), 'synctx-notes');
+  return path.join(process.cwd(), 'samectx-notes');
 }
 
 function analyzeContext(conversationHistory) {
@@ -127,7 +127,7 @@ function analyzeContext(conversationHistory) {
         conversationLength: JSON.stringify(jsonData).split('\n').length,
         metadata: {
           version: '1.0.0',
-          tool: 'synctx',
+          tool: 'samectx',
           format: 'json'
         }
       };

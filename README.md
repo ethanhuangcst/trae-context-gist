@@ -1,4 +1,4 @@
-# synctx
+# samectx
 
 Context sync tool - 整理对话上下文并同步到 GitHub Gist
 
@@ -8,23 +8,23 @@ Context sync tool - 整理对话上下文并同步到 GitHub Gist
 
 ```bash
 # 全局安装
-npm install -g synctx
+npm install -g samectx
 
 # 或使用 npx（无需安装）
-npx synctx --help
+npx samectx --help
 ```
 
 ## 快速开始
 
 ```bash
 # 1. 配置 GitHub Token
-synctx config --token ghp_your_token_here
+samectx config --token ghp_your_token_here
 
 # 2. 同步上下文
-synctx sync
+samectx sync
 
 # 3. 查看笔记列表
-synctx list
+samectx list
 ```
 
 ## 命令
@@ -32,9 +32,9 @@ synctx list
 ### `sync` (别名: `s`) - 同步上下文
 
 ```bash
-synctx sync [options]
+samectx sync [options]
 # 或简写
-synctx s
+samectx s
 
 选项:
   -p, --project <name>  指定项目名称（默认从当前目录提取）
@@ -44,9 +44,9 @@ synctx s
 ### `list` (别名: `l`) - 列出笔记
 
 ```bash
-synctx list [options]
+samectx list [options]
 # 或简写
-synctx l
+samectx l
 
 选项:
   -p, --project <name>  筛选指定项目的笔记
@@ -56,9 +56,9 @@ synctx l
 ### `config` (别名: `c`) - 配置
 
 ```bash
-synctx config [options]
+samectx config [options]
 # 或简写
-synctx c
+samectx c
 
 选项:
   -t, --token <token>   设置 GitHub Token
@@ -68,15 +68,15 @@ synctx c
 ### `init` (别名: `i`) - 初始化项目
 
 ```bash
-synctx init
+samectx init
 # 或简写
-synctx i
+samectx i
 ```
 
 ## 获取 GitHub Token
 
 1. 访问 https://github.com/settings/tokens/new
-2. Note: `synctx`
+2. Note: `samectx`
 3. Expiration: 选择 `Custom` → 设置 1 年后
 4. Select scopes: ✅ `gist`
 5. 点击 Generate token，复制保存
@@ -84,12 +84,12 @@ synctx i
 ## 目录结构
 
 ```
-~/.synctx/                     # 全局配置目录
+~/.samectx/                    # 全局配置目录
 ├── config.json                # 配置文件（Token）
 └── gist-mapping.json          # 项目-Gist 映射
 
 your-project/
-└── synctx-notes/              # 本地笔记
+└── samectx-notes/             # 本地笔记
     ├── context_2026-03-20.json
     └── ...
 ```
@@ -98,17 +98,17 @@ your-project/
 
 | 工具 | 使用方式 |
 |------|---------|
-| TRAE CN | `npx synctx sync` |
-| Cursor | `npx synctx sync` |
-| Claude Code | `npx synctx sync` |
-| 终端 | `synctx sync` |
+| TRAE CN | `npx samectx sync` |
+| Cursor | `npx samectx sync` |
+| Claude Code | `npx samectx sync` |
+| 终端 | `samectx sync` |
 
 ## 故障排除
 
 | 问题 | 解决方案 |
 |------|---------|
-| Token 未配置 | 运行 `synctx config --token <your-token>` |
-| 笔记位置错误 | 检查项目根目录下的 `synctx-notes/` |
+| Token 未配置 | 运行 `samectx config --token <your-token>` |
+| 笔记位置错误 | 检查项目根目录下的 `samectx-notes/` |
 | Gist 上传失败 | 检查 Token 权限和有效期；本地笔记仍可用 |
 
 ---

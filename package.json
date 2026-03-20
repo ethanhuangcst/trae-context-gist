@@ -1,10 +1,10 @@
 {
-  "name": "synctx",
+  "name": "samectx",
   "version": "1.0.0",
   "description": "Context sync tool - 整理对话上下文并同步到 GitHub Gist",
   "main": "src/index.js",
   "bin": {
-    "synctx": "./bin/synctx"
+    "samectx": "./bin/samectx"
   },
   "files": [
     "bin",
