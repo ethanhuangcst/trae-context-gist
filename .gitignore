@@ -20,6 +20,7 @@ gist-mapping.json
 # Local notes
 notes/
 samectx-notes/
+trae-content-gist-notes/
 
 # Test files
 test-*.js

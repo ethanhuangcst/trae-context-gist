@@ -1,5 +1,5 @@
 /**
- * gctx - Context sync tool
+ * samectx - Context sync tool
  * 整理对话上下文并同步到 GitHub Gist
  */
 
@@ -187,7 +187,7 @@ function analyzeContext(conversationHistory) {
     conversationLength: lines.length,
     metadata: {
       version: '1.0.0',
-      tool: 'trae-context-gist',
+      tool: 'samectx',
       format: 'text'
     }
   };
@@ -312,7 +312,7 @@ async function sync(options = {}) {
   if (!token) {
     return {
       success: false,
-      error: 'GitHub Token 未配置，请运行: trae-context-gist config --token <your-token>'
+      error: 'GitHub Token 未配置,请运行: samectx config --token <your-token>'
     };
   }
   
@@ -331,7 +331,7 @@ async function sync(options = {}) {
       summary: '手动同步',
       metadata: {
         version: '1.0.0',
-        tool: 'trae-context-gist'
+        tool: 'samectx'
       }
     };
   }
