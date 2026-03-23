@@ -1,15 +1,15 @@
 /**
- * samectx - Context sync tool
- * 整理对话上下文并同步到 GitHub Gist
+ * samectx - Context management tool
+ * 整理对话上下文并保存到本地目录
  */
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { execSync } = require('child_process');
 
 const CONFIG_DIR = path.join(os.homedir(), '.samectx');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
-const GIST_MAPPING_FILE = path.join(CONFIG_DIR, 'gist-mapping.json');
 
 function ensureConfigDir() {
   if (!fs.existsSync(CONFIG_DIR)) {
@@ -34,23 +34,6 @@ function saveConfig(config) {
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
 }
 
-function getGistMapping() {
-  ensureConfigDir();
-  if (fs.existsSync(GIST_MAPPING_FILE)) {
-    try {
-      return JSON.parse(fs.readFileSync(GIST_MAPPING_FILE, 'utf8'));
-    } catch (e) {
-      return {};
-    }
-  }
-  return {};
-}
-
-function saveGistMapping(mapping) {
-  ensureConfigDir();
-  fs.writeFileSync(GIST_MAPPING_FILE, JSON.stringify(mapping, null, 2));
-}
-
 function extractProjectName(customName) {
   if (customName) {
     return customName.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -60,23 +43,80 @@ function extractProjectName(customName) {
   return projectName.replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
+function sanitizeUsername(username) {
+  if (!username) return 'unknown';
+  return username.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function getUsername() {
+  const config = loadConfig();
+  
+  if (config.username) {
+    return sanitizeUsername(config.username);
+  }
+  
+  try {
+    const gitUsername = execSync('git config user.name', { 
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    }).trim();
+    if (gitUsername) {
+      return {
+        name: sanitizeUsername(gitUsername),
+        source: 'git',
+        rawName: gitUsername
+      };
+    }
+  } catch (e) {
+  }
+  
+  if (process.env.SAMECTX_USER) {
+    return sanitizeUsername(process.env.SAMECTX_USER);
+  }
+  
+  const sysUsername = os.userInfo().username;
+  return {
+    name: sanitizeUsername(sysUsername),
+    source: 'system',
+    rawName: sysUsername
+  };
+}
+
 function getProjectNotesDir(customDir) {
+  const config = loadConfig();
+  let baseDir;
+  
   if (customDir) {
-    if (path.isAbsolute(customDir)) {
-      return customDir;
-    }
-    return path.join(process.cwd(), customDir);
+    baseDir = path.isAbsolute(customDir) 
+      ? customDir 
+      : path.join(process.cwd(), customDir);
+  } else if (config.defaultNotesDir) {
+    baseDir = path.isAbsolute(config.defaultNotesDir)
+      ? config.defaultNotesDir
+      : path.join(process.cwd(), config.defaultNotesDir);
+  } else if (process.env.LOCAL_NOTES_DIR) {
+    baseDir = path.isAbsolute(process.env.LOCAL_NOTES_DIR)
+      ? process.env.LOCAL_NOTES_DIR
+      : path.join(process.cwd(), process.env.LOCAL_NOTES_DIR);
+  } else {
+    baseDir = path.join(process.cwd(), 'samectx-notes');
   }
   
-  if (process.env.LOCAL_NOTES_DIR) {
-    const notesDir = process.env.LOCAL_NOTES_DIR;
-    if (path.isAbsolute(notesDir)) {
-      return notesDir;
-    }
-    return path.join(process.cwd(), notesDir);
-  }
+  const usernameResult = getUsername();
+  const username = typeof usernameResult === 'object' ? usernameResult.name : usernameResult;
   
-  return path.join(process.cwd(), 'samectx-notes');
+  return {
+    path: path.join(baseDir, username),
+    usernameInfo: usernameResult
+  };
+}
+
+function parseListParam(param) {
+  if (!param) return [];
+  return param
+    .split(';')
+    .map(item => item.trim())
+    .filter(Boolean);
 }
 
 function analyzeContext(conversationHistory) {
@@ -201,168 +241,95 @@ function saveNoteToLocal(content, fileName, notesDir) {
   const notePath = path.join(notesDir, fileName);
   fs.writeFileSync(notePath, JSON.stringify(content, null, 2));
   
+  const stats = fs.statSync(notePath);
+  
   return {
     fileName,
     localPath: notePath,
+    fileSize: stats.size,
     savedAt: new Date().toISOString()
   };
 }
 
-const MAX_GIST_FILES = 50;
-
-async function uploadToGist(content, fileName, projectName, token) {
-  let fetchFn;
-  if (typeof fetch !== 'undefined') {
-    fetchFn = fetch;
-  } else {
-    try {
-      fetchFn = require('node-fetch');
-    } catch (e) {
-      throw new Error('无法找到 fetch 函数，请安装 node-fetch: npm install node-fetch');
-    }
-  }
-  
-  const description = `TRAE CN - ${projectName}`;
-  const mapping = getGistMapping();
-  const existingGistId = mapping[projectName];
-  
-  if (existingGistId) {
-    try {
-      const getResponse = await fetchFn(`https://api.github.com/gists/${existingGistId}`, {
-        headers: {
-          'Authorization': `token ${token}`,
-          'User-Agent': 'TRAE-CN-ContextManager'
-        }
-      });
-      
-      if (getResponse.ok) {
-        const existingGist = await getResponse.json();
-        const existingFiles = Object.keys(existingGist.files || {});
-        
-        const files = {};
-        
-        if (existingFiles.length >= MAX_GIST_FILES) {
-          const filesToDelete = existingFiles.slice(0, existingFiles.length - MAX_GIST_FILES + 1);
-          filesToDelete.forEach(f => {
-            files[f] = null;
-          });
-        }
-        
-        files[fileName] = {
-          content: JSON.stringify(content, null, 2)
-        };
-        
-        const updateResponse = await fetchFn(`https://api.github.com/gists/${existingGistId}`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `token ${token}`,
-            'Content-Type': 'application/json',
-            'User-Agent': 'TRAE-CN-ContextManager'
-          },
-          body: JSON.stringify({
-            description: description,
-            files: files
-          })
-        });
-        
-        if (updateResponse.ok) {
-          return await updateResponse.json();
-        }
-      }
-    } catch (e) {
-      console.warn(`更新现有 Gist 失败，将创建新 Gist: ${e.message}`);
-    }
-  }
-  
-  const files = {};
-  files[fileName] = {
-    content: JSON.stringify(content, null, 2)
-  };
-  
-  const response = await fetchFn('https://api.github.com/gists', {
-    method: 'POST',
-    headers: {
-      'Authorization': `token ${token}`,
-      'Content-Type': 'application/json',
-      'User-Agent': 'TRAE-CN-ContextManager'
-    },
-    body: JSON.stringify({
-      description: description,
-      public: false,
-      files: files
-    })
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`上传失败 (${response.status}): ${errorText}`);
-  }
-  
-  const gistInfo = await response.json();
-  mapping[projectName] = gistInfo.id;
-  saveGistMapping(mapping);
-  
-  return gistInfo;
-}
-
 async function sync(options = {}) {
-  const config = loadConfig();
-  const token = config.githubToken;
-  
-  if (!token) {
-    return {
-      success: false,
-      error: 'GitHub Token 未配置,请运行: samectx config --token <your-token>'
-    };
-  }
-  
-  const projectName = extractProjectName(options.project);
-  const notesDir = getProjectNotesDir(options.dir);
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const fileName = `context_${timestamp}.json`;
-  
-  let content;
-  if (options.content) {
-    content = analyzeContext(options.content);
-  } else {
-    content = {
+  try {
+    const projectName = extractProjectName(options.project);
+    const notesDirResult = getProjectNotesDir(options.dir);
+    const notesDir = notesDirResult.path;
+    const usernameInfo = notesDirResult.usernameInfo;
+    const username = typeof usernameInfo === 'object' ? usernameInfo.name : usernameInfo;
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const fileName = `context_${timestamp}_${randomSuffix}.json`;
+    
+    let tasks = parseListParam(options.tasks);
+    let keyPoints = parseListParam(options.keypoints);
+    let decisions = parseListParam(options.decisions);
+    
+    if (options.content) {
+      const analysis = analyzeContext(options.content);
+      tasks = tasks.concat(analysis.tasks || []);
+      keyPoints = keyPoints.concat(analysis.keyPoints || []);
+      decisions = decisions.concat(analysis.decisions || []);
+    }
+    
+    const hasKeyInfo = tasks.length > 0 || keyPoints.length > 0 || decisions.length > 0;
+    
+    const content = {
       projectName,
+      username,
       timestamp: new Date().toISOString(),
-      summary: '手动同步',
+      summary: hasKeyInfo 
+        ? `对话包含 ${tasks.length} 个任务、${keyPoints.length} 个关键点和 ${decisions.length} 个决策`
+        : '手动同步',
+      tasks,
+      keyPoints,
+      decisions,
       metadata: {
         version: '1.0.0',
         tool: 'samectx'
       }
     };
-  }
-  
-  const localInfo = saveNoteToLocal(content, fileName, notesDir);
-  
-  let gistInfo = null;
-  let gistError = null;
-  
-  try {
-    gistInfo = await uploadToGist(content, fileName, projectName, token);
+    
+    const localInfo = saveNoteToLocal(content, fileName, notesDir);
+    
+    return {
+      success: true,
+      projectName,
+      username,
+      usernameSource: typeof usernameInfo === 'object' ? usernameInfo.source : 'config',
+      localPath: localInfo.localPath,
+      fileSize: localInfo.fileSize,
+      hasKeyInfo,
+      analysis: {
+        taskCount: tasks.length,
+        keyPointCount: keyPoints.length,
+        decisionCount: decisions.length
+      }
+    };
   } catch (error) {
-    gistError = error.message;
-  }
-  
-  return {
-    success: true,
-    projectName,
-    localPath: localInfo.localPath,
-    gistUrl: gistInfo ? gistInfo.html_url : null,
-    gistError,
-    analysis: {
-      taskCount: content.tasks ? content.tasks.length : 0,
-      keyPointCount: content.keyPoints ? content.keyPoints.length : 0,
-      decisionCount: content.decisions ? content.decisions.length : 0
+    let suggestion = '请检查错误信息并重试';
+    
+    if (error.code === 'EACCES') {
+      suggestion = '请检查目录权限或使用 -d 参数指定其他目录';
+    } else if (error.code === 'ENOSPC') {
+      suggestion = '请清理磁盘空间或使用 -d 参数指定其他磁盘';
+    } else if (error.code === 'EROFS') {
+      suggestion = '请检查文件系统状态或联系系统管理员';
     }
-  };
+    
+    return {
+      success: false,
+      error: error.message,
+      suggestion
+    };
+  }
 }
 
 function listNotes(options = {}) {
-  const notesDir = getProjectNotesDir(options.dir);
+  const notesDirResult = getProjectNotesDir(options.dir);
+  const notesDir = notesDirResult.path;
   
   if (!fs.existsSync(notesDir)) {
     return [];
@@ -379,8 +346,12 @@ function listNotes(options = {}) {
         fileName: file,
         localPath: filePath,
         projectName: content.projectName || 'unknown',
+        username: content.username || 'unknown',
         timestamp: content.timestamp,
-        summary: content.summary
+        summary: content.summary,
+        taskCount: content.tasks ? content.tasks.length : 0,
+        keyPointCount: content.keyPoints ? content.keyPoints.length : 0,
+        decisionCount: content.decisions ? content.decisions.length : 0
       });
     } catch (e) {
     }
@@ -400,6 +371,9 @@ module.exports = {
   saveConfig,
   extractProjectName,
   getProjectNotesDir,
+  getUsername,
+  sanitizeUsername,
+  parseListParam,
   analyzeContext,
   CONFIG_DIR,
   CONFIG_FILE

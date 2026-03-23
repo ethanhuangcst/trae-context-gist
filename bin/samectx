@@ -6,15 +6,19 @@ const cli = require('../src/cli');
 
 program
   .name('samectx')
-  .description('Context sync tool - 整理对话上下文并同步到 GitHub Gist')
+  .description('Context management tool - 整理对话上下文并保存到本地目录')
   .version(pkg.version);
 
 program
   .command('sync')
   .alias('s')
-  .description('同步当前项目的对话上下文到本地和 GitHub Gist')
+  .description('保存当前项目的对话上下文到本地目录')
   .option('-p, --project <name>', '指定项目名称（默认从当前目录提取）')
   .option('-d, --dir <path>', '指定笔记存储目录')
+  .option('-t, --tasks <list>', '关键任务列表（分号分隔）')
+  .option('-k, --keypoints <list>', '关键点列表（分号分隔）')
+  .option('-D, --decisions <list>', '关键决策列表（分号分隔）')
+  .option('-c, --content <text>', '完整对话内容（自动分析提取）')
   .action(async (options) => {
     await cli.sync(options);
   });
@@ -24,7 +28,6 @@ program
   .alias('l')
   .description('列出所有笔记')
   .option('-p, --project <name>', '筛选指定项目的笔记')
-  .option('-l, --local', '只显示本地笔记')
   .action(async (options) => {
     await cli.list(options);
   });
@@ -32,8 +35,9 @@ program
 program
   .command('config')
   .alias('c')
-  .description('配置 GitHub Token')
-  .option('-t, --token <token>', '设置 GitHub Token')
+  .description('配置管理')
+  .option('-u, --username <name>', '设置用户名')
+  .option('-d, --dir <path>', '设置默认笔记目录')
   .option('-s, --show', '显示当前配置')
   .action(async (options) => {
     await cli.config(options);

@@ -48,6 +48,67 @@
 └─────────────────┘
 ```
 
+### SKILL + npm 协作架构（关键信息记录）
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    TRAE / Cursor / Claude Code              │
+│                                                             │
+│  ┌─────────────┐     ┌─────────────────────────────────┐   │
+│  │   AI 对话   │ ──→ │ SKILL 分析对话，提取关键信息    │   │
+│  │             │     │ - 关键任务 (tasks)              │   │
+│  │             │     │ - 关键点 (keyPoints)            │   │
+│  │             │     │ - 关键决策 (decisions)          │   │
+│  └─────────────┘     └──────────────┬──────────────────┘   │
+│                                     │                       │
+│                                     ↓                       │
+│                     ┌───────────────────────────────────┐   │
+│                     │ 生成命令:                         │   │
+│                     │ samectx sync --tasks "..."        │   │
+│                     │   --keypoints "..." --decisions "..."│
+│                     └──────────────┬────────────────────┘   │
+└────────────────────────────────────┼───────────────────────┘
+                                     │
+                                     ↓
+┌─────────────────────────────────────────────────────────────┐
+│                    npm-samectx (独立进程)                    │
+│                                                             │
+│  samectx sync --tasks "..." --keypoints "..." --decisions "..."│
+│                     │                                       │
+│                     ↓                                       │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ 保存到本地文件                                       │   │
+│  │ samectx-notes/{username}/context_xxx.json           │   │
+│  │                                                      │   │
+│  │ {                                                    │   │
+│  │   "projectName": "...",                             │   │
+│  │   "username": "...",                                │   │
+│  │   "timestamp": "...",                               │   │
+│  │   "summary": "...",                                 │   │
+│  │   "tasks": ["任务1", "任务2"],                      │   │
+│  │   "keyPoints": ["关键点1"],                         │   │
+│  │   "decisions": ["决策1"],                           │   │
+│  │   "metadata": {...}                                 │   │
+│  │ }                                                    │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**协作流程说明**：
+
+1. **SKILL 职责**（在 AI 工具进程中）：
+   - 监听用户触发同步的信号
+   - 分析当前对话内容
+   - 提取关键任务、关键点、关键决策
+   - 生成带参数的 `samectx sync` 命令
+   - 提示用户执行命令
+
+2. **npm 职责**（独立进程）：
+   - 接收命令行参数
+   - 验证参数格式
+   - 保存结构化笔记到本地
+   - 返回执行结果
+
 ### 多用户协作架构
 
 ```
@@ -92,15 +153,44 @@
 samectx sync [options]    // 保存上下文
   -p, --project <name>    // 指定项目名称
   -d, --dir <path>        // 指定笔记目录
+  -t, --tasks <list>      // 关键任务列表（分号分隔）
+  -k, --keypoints <list>  // 关键点列表（分号分隔）
+  -D, --decisions <list>  // 关键决策列表（分号分隔）
+  -c, --content <text>    // 完整对话内容（自动分析）
 
 samectx list [options]    // 列出笔记
   -p, --project <name>    // 筛选项目
 
 samectx config [options]  // 配置管理
+  -u, --username <name>   // 设置用户名
   -d, --dir <path>        // 设置默认笔记目录
   -s, --show              // 显示配置
 
 samectx init              // 初始化项目
+```
+
+#### sync 命令参数详解
+
+| 参数 | 简写 | 类型 | 说明 |
+|------|------|------|------|
+| `--project` | `-p` | string | 项目名称，默认从当前目录提取 |
+| `--dir` | `-d` | string | 笔记存储目录，默认 `./samectx-notes/` |
+| `--tasks` | `-t` | string | 关键任务列表，用分号 `;` 分隔 |
+| `--keypoints` | `-k` | string | 关键点列表，用分号 `;` 分隔 |
+| `--decisions` | `-D` | string | 关键决策列表，用分号 `;` 分隔 |
+| `--content` | `-c` | string | 完整对话内容，自动分析提取 |
+
+**使用示例**：
+
+```bash
+# SKILL 生成的命令示例
+samectx sync --tasks "实现用户登录功能;修复登录页面样式" --keypoints "使用JWT进行认证" --decisions "选择bcrypt加密密码"
+
+# 传入完整对话内容
+samectx sync --content "用户要求实现登录功能，我们讨论了JWT和Session两种方案，最终决定使用JWT..."
+
+# 基本同步（无关键信息）
+samectx sync
 ```
 
 ### 2. 核心模块 (src/index.js)
@@ -648,13 +738,17 @@ project-a/                   # 项目目录
  * @param {Object} options
  * @param {string} options.project - 项目名称（可选）
  * @param {string} options.dir - 笔记目录（可选）
- * @param {string} options.content - 对话内容（可选）
+ * @param {string} options.tasks - 关键任务列表（分号分隔）
+ * @param {string} options.keypoints - 关键点列表（分号分隔）
+ * @param {string} options.decisions - 关键决策列表（分号分隔）
+ * @param {string} options.content - 完整对话内容（自动分析）
  * @returns {Promise<Object>} 保存结果
  */
 async function sync(options) {
   return {
     success: boolean,
     projectName: string,
+    username: string,
     localPath: string,
     fileSize: number,
     error: string | null,
@@ -665,6 +759,53 @@ async function sync(options) {
       decisionCount: number
     }
   };
+}
+```
+
+**处理逻辑**：
+
+```javascript
+async function sync(options = {}) {
+  // 1. 解析关键信息参数
+  let tasks = [];
+  let keyPoints = [];
+  let decisions = [];
+  
+  if (options.tasks) {
+    tasks = options.tasks.split(';').map(t => t.trim()).filter(Boolean);
+  }
+  if (options.keypoints) {
+    keyPoints = options.keypoints.split(';').map(k => k.trim()).filter(Boolean);
+  }
+  if (options.decisions) {
+    decisions = options.decisions.split(';').map(d => d.trim()).filter(Boolean);
+  }
+  
+  // 2. 如果传入完整内容，自动分析
+  if (options.content) {
+    const analysis = analyzeContext(options.content);
+    tasks = tasks.concat(analysis.tasks || []);
+    keyPoints = keyPoints.concat(analysis.keyPoints || []);
+    decisions = decisions.concat(analysis.decisions || []);
+  }
+  
+  // 3. 构建笔记内容
+  const content = {
+    projectName: extractProjectName(options.project),
+    username: getUsername(),
+    timestamp: new Date().toISOString(),
+    summary: `对话包含 ${tasks.length} 个任务、${keyPoints.length} 个关键点和 ${decisions.length} 个决策`,
+    tasks,
+    keyPoints,
+    decisions,
+    metadata: {
+      version: '1.0.0',
+      tool: 'samectx'
+    }
+  };
+  
+  // 4. 保存到本地
+  return saveNoteToLocal(content, notesDir);
 }
 ```
 
